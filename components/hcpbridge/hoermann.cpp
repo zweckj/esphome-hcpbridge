@@ -121,7 +121,7 @@ void HoermannGarageEngine::setCommandValuesToRead()
   setRegister9CB9(3, regPlug3Value);
 }
 
-uint16_t HoermannGarageEngine::onDoorPositonChanged(uint16_t val)
+uint16_t HoermannGarageEngine::onDoorPositionChanged(uint16_t val)
 {
   uint16_t oldVal = getRegister9D31(1);
   

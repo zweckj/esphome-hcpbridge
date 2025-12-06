@@ -115,7 +115,7 @@ public:
     // Callbacks for modbus server events
     void onModbusRequest();
     void setCommandValuesToRead();
-    uint16_t onDoorPositonChanged(uint16_t val);
+    uint16_t onDoorPositionChanged(uint16_t val);
     uint16_t onCurrentStateChanged(uint16_t val);
     uint16_t onRegSevenChanged(uint16_t val);
 

@@ -84,7 +84,7 @@ modbus_server:
           auto engine = &HoermannGarageEngine::getInstance();
           uint16_t offset = address - 0x9D31;
           if (offset == 1) {
-            value = engine->onDoorPositonChanged(value);
+            value = engine->onDoorPositionChanged(value);
           } else if (offset == 2) {
             value = engine->onCurrentStateChanged(value);
           } else if (offset == 6) {

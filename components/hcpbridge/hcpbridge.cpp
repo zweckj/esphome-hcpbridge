@@ -5,12 +5,10 @@ namespace hcpbridge {
 
 static const char *TAG = "hcpbridge";
 void HCPBridge::setup() {
-  int8_t rx = this->rx_pin_ == nullptr ? PIN_RXD : this->rx_pin_->get_pin();
-  int8_t tx = this->tx_pin_ == nullptr ? PIN_TXD : this->tx_pin_->get_pin();
-  int8_t rts = this->rts_pin_ == nullptr ? -1 : this->rts_pin_->get_pin();
-
   this->engine = &HoermannGarageEngine::getInstance();
-  this->engine->setup(rx, tx, rts);
+  // UART and Modbus server are now configured via YAML
+  this->engine->setup(-1, -1, -1);
+  ESP_LOGI(TAG, "HCPBridge component initialized");
 }
 void HCPBridge::add_on_state_callback(std::function<void()> &&callback, const char *tag) {
   auto wrapped_callback = [callback, tag]() {

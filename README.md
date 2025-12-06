@@ -19,25 +19,88 @@ substitutions:
 esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
-  libraries:
-    - emelianov/modbus-esp8266 # Required for communication with the modbus
   platformio_options:
     board_build.f_cpu: 240000000L
 
 external_components:
-    source: github://14yannick/esphome-hcpbridge
+  - source: github://14yannick/esphome-hcpbridge
     refresh: 0s # Ensure you always get the latest version
+  - source: github://epiclabs-uc/esphome-modbus-server
+    refresh: 60s
+    components: [modbus_server]
 
 esp32:
-  board: #adafruit_feather_esp32s3 #set your board
+  board: adafruit_feather_esp32s3 #set your board
   framework:
     type: arduino
 
+# UART configuration for Modbus RTU communication
+uart:
+  - id: uart_modbus
+    tx_pin: 17  # Change to match your hardware
+    rx_pin: 18  # Change to match your hardware
+    baud_rate: 57600
+    stop_bits: 1
+    data_bits: 8
+    parity: EVEN
+
+# Modbus Server configuration - ESP32 acts as Modbus slave
+modbus_server:
+  - id: modbus_hcp
+    uart_id: uart_modbus
+    address: 2  # Modbus slave address
+    
+    # Register configuration for Hörmann garage door controller
+    holding_registers:
+      # Command registers (0x9C41 to 0x9C43)
+      - start_address: 0x9C41
+        number: 3
+        on_write: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          if (address == 0x9C41) {
+            engine->onCounterWrite(value);
+          }
+          engine->setRegister9C41(address - 0x9C41, value);
+          return value;
+        on_read: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          return engine->getRegister9C41(address - 0x9C41);
+      
+      # Internal State registers (0x9CB9 to 0x9CC0)
+      - start_address: 0x9CB9
+        number: 8
+        on_read: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          if (address == 0x9CB9) {
+            engine->onModbusRequest();
+          }
+          return engine->getRegister9CB9(address - 0x9CB9);
+        on_write: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          engine->setRegister9CB9(address - 0x9CB9, value);
+          return value;
+      
+      # Broadcast registers (0x9D31 to 0x9D39)
+      - start_address: 0x9D31
+        number: 9
+        on_write: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          uint16_t offset = address - 0x9D31;
+          if (offset == 1) {
+            value = engine->onDoorPositonChanged(value);
+          } else if (offset == 2) {
+            value = engine->onCurrentStateChanged(value);
+          } else if (offset == 6) {
+            value = engine->onRegSevenChanged(value);
+          }
+          engine->setRegister9D31(offset, value);
+          return value;
+        on_read: |-
+          auto engine = &HoermannGarageEngine::getInstance();
+          return engine->getRegister9D31(address - 0x9D31);
+
 hcpbridge:
   id: hcpbridge_id
-  rx_pin: 18 # optional, default=18
-  tx_pin: 17 # optional, default=17
-  #rts_pin : 1 # optional RTS pin to use if hardware automatic control flow is not available.
 
 cover:
   - platform: hcpbridge
@@ -189,7 +252,7 @@ Known working hardware are the ESP32 and S3 dual core chip.
 # ToDo
 
 - [x] Initial working version
-- [ ] Use esphome modbus component instead of own code
+- [x] Use esphome modbus component instead of own code
 - [x] Map additional functions to esphome
 - [x] Use callbacks instead of pollingComponent (Only hcpbridge is polling)
 - [x] Expert options for the HCPBridge component (GPIOs ...)

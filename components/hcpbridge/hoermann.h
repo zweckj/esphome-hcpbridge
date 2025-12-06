@@ -2,18 +2,14 @@
 
 #ifndef HOERMANN_H_
 #define HOERMANN_H_
-#define MODBUSRTU_DEBUG 1
 
 #include <Arduino.h>
 #include <Stream.h>
-
-#include "ModbusRTU.h"
 
 #define SLAVE_ID 2
 #define SIMULATEKEYPRESSDELAYMS 100
 #define DEADREPORTTIMEOUT 60000
 
-#define RS485 Serial2
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #define PIN_TXD 17
 #define PIN_RXD 18
@@ -107,17 +103,26 @@ public:
     static HoermannGarageEngine& getInstance();
 
     void setup(int8_t rx, int8_t tx, int8_t rts);
-    void handleModbus();
-    Modbus::ResultCode onRequest(Modbus::FunctionCode fc, const Modbus::RequestData data);
+    
+    // Modbus register access methods for use by modbus_server callbacks
+    uint16_t getRegister9CB9(uint16_t offset);
+    void setRegister9CB9(uint16_t offset, uint16_t value);
+    uint16_t getRegister9C41(uint16_t offset);
+    void setRegister9C41(uint16_t offset, uint16_t value);
+    uint16_t getRegister9D31(uint16_t offset);
+    void setRegister9D31(uint16_t offset, uint16_t value);
+    
+    // Callbacks for modbus server events
+    void onModbusRequest();
     void setCommandValuesToRead();
-    uint16_t onDoorPositonChanged(TRegister *reg, uint16_t val);
-    uint16_t onCurrentStateChanged(TRegister *reg, uint16_t val);
-    uint16_t onRegSevenChanged(TRegister *reg, uint16_t val);
+    uint16_t onDoorPositonChanged(uint16_t val);
+    uint16_t onCurrentStateChanged(uint16_t val);
+    uint16_t onRegSevenChanged(uint16_t val);
 
     /**
      * Write on 0x9C41 , byte1: counter, byte2: command
      */
-    uint16_t onCounterWrite(TRegister *reg, uint16_t val);
+    uint16_t onCounterWrite(uint16_t val);
 
     /**
      * Helper to set next Command and *not* skip Current Command before end was sent
@@ -139,8 +144,12 @@ public:
 
 private:
     HoermannGarageEngine(){};
-    ModbusRTU mb;                                 // ModbusRTU instance, the man behind the curtain
     const HoermannCommand *nextCommand = nullptr; // Next Command to transmit
     unsigned long commandWrittenOn = 0;           // When was last command written (wait 100ms before end of command is transmitted)
+    
+    // Internal register storage (replacing ModbusRTU internal storage)
+    uint16_t reg_9CB9[8] = {0};  // Internal State registers
+    uint16_t reg_9C41[3] = {0};  // Command registers
+    uint16_t reg_9D31[9] = {0};  // Broadcast registers
 };
 #endif

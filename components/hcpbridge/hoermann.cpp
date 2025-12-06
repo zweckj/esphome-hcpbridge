@@ -70,6 +70,7 @@ void HoermannGarageEngine::onModbusRequest()
   this->state->recordModbusResponse();
 
   // Update internal state registers based on current command
+  // This is called when the master reads from 0x9CB9, preparing the response registers
   setRegister9CB9(0, 0x0000);
   setRegister9CB9(1, 0x0001);
   setCommandValuesToRead();
@@ -77,6 +78,13 @@ void HoermannGarageEngine::onModbusRequest()
   setRegister9CB9(5, 0x0000);
   setRegister9CB9(6, 0x0000);
   setRegister9CB9(7, 0x0000);
+
+  // Note: The old implementation had special handling for BusScan requests
+  // (returning 0x0000, 0x0005, 0x0430, 0x10ff, 0xa845 for a specific request pattern).
+  // With the new modbus_server approach, this would need to be detected based on
+  // the write pattern to 0x9C41 if needed. BusScan appears to be a device discovery
+  // feature that may only be used during initial setup.
+  // TODO: If BusScan functionality is required, add detection logic here
 
   this->state->setValid(true);
 }

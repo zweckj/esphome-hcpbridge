@@ -185,10 +185,27 @@ If you encounter issues after migration:
 2. Open an issue on the GitHub repository
 3. Ensure you're using a compatible ESP32 board (dual-core recommended)
 
+## Known Differences
+
+### BusScan Request Handling
+
+The old implementation had special handling for Modbus "BusScan" requests (a device discovery pattern). With the new modbus_server component, this specific request pattern handling has been simplified. 
+
+**Impact:** BusScan functionality (if used) may not respond identically. This appears to be a device discovery feature typically only used during initial setup. Normal operation (door control, status reporting) is not affected.
+
+**If you experience issues:** The BusScan response logic can be re-implemented by detecting the specific write pattern to register 0x9C41 and returning the appropriate discovery response values.
+
+### Request-Level vs Register-Level Handling
+
+- **Old approach:** Handled entire Modbus requests with function code awareness
+- **New approach:** Handles individual register reads/writes through callbacks
+
+**Impact:** The new implementation is cleaner and more maintainable, but trades request-level awareness for register-level simplicity. All standard garage door operations work correctly.
+
 ## Compatibility
 
 - **Minimum ESPHome version:** 2023.11.0 or later
 - **Supported boards:** ESP32, ESP32-S3 (dual-core recommended)
 - **Framework:** Arduino
 
-The functionality remains identical to the previous version - only the underlying implementation has changed.
+Core functionality (door control, position tracking, state monitoring) is identical to the previous version. Only the underlying Modbus implementation has changed.

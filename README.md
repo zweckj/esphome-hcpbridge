@@ -240,9 +240,28 @@ To enable migration, the following features would need to be added to ESPHome's 
 3. **Per-register write notification**: Fire callbacks when specific holding registers are written by the master, passing both old and new values.
 4. **Configurable task scheduling**: Allow Modbus processing on a dedicated FreeRTOS task for timing-critical protocols.
 
+## Why Not Split FC23 into FC16 + FC04?
+
+A natural question is whether FC23 (Read/Write Multiple Registers) could be decomposed into two separate operations that ESPHome *does* support — for example FC16 (0x10, Write Multiple Registers) + FC04 (0x04, Read Input Registers).
+
+**This is not possible because the ESP32 is the Modbus slave, not the master.** The Hörmann garage door controller is the Modbus master — it decides which function codes to send. The ESP32 must respond to whatever the master sends ([`mb.slave(SLAVE_ID)`](components/hcpbridge/hoermann.cpp#L47)).
+
+In the HCP protocol, the master sends FC23 frames to the ESP32 slave. The slave cannot tell the master to use different function codes. This is a fixed hardware protocol defined by Hörmann, not something configurable on the ESP side.
+
+Specifically, looking at the [`onRequest` handler](components/hcpbridge/hoermann.cpp#L94-L140):
+
+```
+Master → Slave (FC23): Write 2 regs at 0x9C41, Read 8 regs at 0x9CB9   (command cycle)
+Master → Slave (FC23): Write 2 regs at 0x9C41, Read 2 regs at 0x9CB9   (empty command)
+Master → Slave (FC23): Write 3 regs at 0x9C41, Read 5 regs at 0x9CB9   (bus scan)
+Master → Slave (FC16): Write 9 regs at 0x9D31                          (broadcast state)
+```
+
+The first three message types all use FC23 — these are initiated by the Hörmann controller and cannot be changed. Only the broadcast state update uses FC16, which ESPHome already supports.
+
 ## Conclusion
 
-The migration is **not currently feasible**. The Hörmann HCP protocol fundamentally relies on Modbus Function Code 23 (Read/Write Multiple Registers), which ESPHome explicitly does not implement. Until ESPHome adds FC23 server-side support and pre-response callbacks, this project must continue using the `emelianov/modbus-esp8266` library.
+The migration is **not currently feasible**. The Hörmann garage door controller (Modbus master) uses Function Code 23 (Read/Write Multiple Registers) for its primary communication, and the ESP32 (Modbus slave) must support it. Since ESPHome does not implement FC23 in server mode, this project must continue using the `emelianov/modbus-esp8266` library. We cannot work around this by splitting FC23 into separate function codes because the master — not the slave — determines which function codes are used.
 
 # Contribute
 

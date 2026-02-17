@@ -219,7 +219,7 @@ ESPHome supports Modbus RTU server mode via `role: server` in the `modbus` compo
 | 0x10 | Write Multiple Registers | ✅ |
 | **0x17** | **Read/Write Multiple Registers** | **❌ "not implemented"** |
 
-(Source: [ESPHome `modbus_definitions.h`](https://github.com/esphome/esphome/blob/dev/esphome/components/modbus/modbus_definitions.h) — `READ_WRITE_MULTIPLE_REGISTERS = 0x17, // not implemented`)
+(Source: [ESPHome `modbus_definitions.h` Line 37](https://github.com/esphome/esphome/blob/dev/esphome/components/modbus/modbus_definitions.h#L37) — `READ_WRITE_MULTIPLE_REGISTERS = 0x17, // not implemented`)
 
 ## Gap Analysis
 

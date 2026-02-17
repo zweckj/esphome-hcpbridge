@@ -189,10 +189,60 @@ Known working hardware are the ESP32 and S3 dual core chip.
 # ToDo
 
 - [x] Initial working version
-- [ ] Use esphome modbus component instead of own code
+- [ ] Use esphome modbus component instead of own code (see [Migration Analysis](#migration-to-esphome-native-modbus) below)
 - [x] Map additional functions to esphome
 - [x] Use callbacks instead of pollingComponent (Only hcpbridge is polling)
 - [x] Expert options for the HCPBridge component (GPIOs ...)
+
+# Migration to ESPHome Native Modbus
+
+This section documents why the project currently cannot migrate away from the third-party `emelianov/modbus-esp8266` library to ESPHome's native `modbus`/`modbus_controller` components.
+
+## Current Architecture
+
+The ESP32 acts as a **Modbus RTU slave** (address 2) communicating with the Hörmann garage door controller (the master) over RS485 at 57600 baud, 8E1. The third-party library provides:
+
+- **Function Code 23 (0x17) — Read/Write Multiple Registers**: The Hörmann HCP protocol uses FC23 as its primary communication method. In a single Modbus frame, the master writes command registers (`0x9C41`) and reads state registers (`0x9CB9`) simultaneously.
+- **`onRequest` callback**: Before responding to a request, the code dynamically prepares response data based on the request type (command request, bus scan, or empty command).
+- **`onSet` per-register callbacks**: When the master writes specific registers (e.g., broadcast state at `0x9D31`), callbacks fire to decode door position, state changes, and light/relay status in real-time.
+- **Dedicated FreeRTOS task**: Modbus handling runs on a separate high-priority task pinned to core 1 to meet the strict timing requirements of the HCP protocol.
+
+## ESPHome Native Modbus Capabilities (as of 2025.x / 2026.x)
+
+ESPHome supports Modbus RTU server mode via `role: server` in the `modbus` component. However, its server implementation only handles the following function codes:
+
+| Function Code | Description | Supported |
+|---|---|---|
+| 0x03 | Read Holding Registers | ✅ |
+| 0x04 | Read Input Registers | ✅ |
+| 0x06 | Write Single Register | ✅ |
+| 0x10 | Write Multiple Registers | ✅ |
+| **0x17** | **Read/Write Multiple Registers** | **❌ "not implemented"** |
+
+(Source: [ESPHome `modbus_definitions.h`](https://github.com/esphome/esphome/blob/dev/esphome/components/modbus/modbus_definitions.h) — `READ_WRITE_MULTIPLE_REGISTERS = 0x17, // not implemented`)
+
+## Gap Analysis
+
+| Feature Required by HCPBridge | ESPHome Native Support | Status |
+|---|---|---|
+| FC23 Read/Write Multiple Registers (0x17) | ❌ Not implemented | **CRITICAL — Blocks migration** |
+| Pre-response callback (`onRequest`) to prepare register values before reply | ❌ Not available | **CRITICAL — Blocks migration** |
+| Per-register write callbacks (`onSet`) for real-time state decoding | Partial (`write_lambda` on `ServerRegister`) | Significant gap |
+| Dedicated high-priority FreeRTOS task for Modbus I/O | ❌ Runs in main loop | Significant gap |
+| Direct register read/write with timing-based command sequences | ❌ Simplified register model | Significant gap |
+
+## What Would Need to Change in ESPHome
+
+To enable migration, the following features would need to be added to ESPHome's native Modbus component:
+
+1. **FC23 support in server mode**: Parse incoming Read/Write Multiple Registers requests and dispatch them to device handlers. This is the single most critical missing feature.
+2. **Pre-response callback**: Allow devices to dynamically prepare response register data after receiving a request but before the response frame is sent.
+3. **Per-register write notification**: Fire callbacks when specific holding registers are written by the master, passing both old and new values.
+4. **Configurable task scheduling**: Allow Modbus processing on a dedicated FreeRTOS task for timing-critical protocols.
+
+## Conclusion
+
+The migration is **not currently feasible**. The Hörmann HCP protocol fundamentally relies on Modbus Function Code 23 (Read/Write Multiple Registers), which ESPHome explicitly does not implement. Until ESPHome adds FC23 server-side support and pre-response callbacks, this project must continue using the `emelianov/modbus-esp8266` library.
 
 # Contribute
 
